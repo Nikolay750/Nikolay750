@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Проверка ИД — очередь</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #ffffff);
+    --text: var(--tg-theme-text-color, #1a1a1a);
+    --hint: var(--tg-theme-hint-color, #8a8a8a);
+    --link: var(--tg-theme-link-color, #2678b6);
+    --button: var(--tg-theme-button-color, #2678b6);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #f2f2f2);
+    --fail: #d84b4b;
+    --warn: #c98a1d;
+    --ok: #2fa360;
+    --needs: #6b6ecb;
+    --info: #8a8a8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 14px 16px 8px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  .hint { color: var(--hint); font-size: 13px; }
+  .list { padding: 8px 12px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .card {
+    background: var(--secondary-bg); border-radius: 12px; padding: 12px 14px;
+    cursor: pointer;
+  }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .client { font-weight: 600; }
+  .card .status { font-size: 12px; padding: 2px 8px; border-radius: 999px; color: #fff; white-space: nowrap; }
+  .st-queued, .st-processing { background: var(--info); }
+  .st-ready_for_review { background: var(--warn); }
+  .st-error { background: var(--fail); }
+  .st-reviewed, .st-sent { background: var(--ok); }
+  .card .meta { color: var(--hint); font-size: 13px; margin-top: 4px; }
+  .pill-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: rgba(0,0,0,.06); }
+  .pill.FAIL { color: var(--fail); } .pill.WARNING { color: var(--warn); }
+  .pill.OK { color: var(--ok); } .pill.NEEDS_CONTEXT { color: var(--needs); } .pill.INFO { color: var(--info); }
+  .empty { text-align: center; color: var(--hint); padding: 48px 16px; }
+
+  #detail { display: none; }
+  .backbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; }
+  .backbar button { background: none; border: none; color: var(--link); font-size: 15px; padding: 6px; }
+  .finding {
+    background: var(--secondary-bg); border-radius: 12px; padding: 12px 14px; margin: 0 12px 10px;
+  }
+  .finding .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; color: #fff; }
+  .finding .rule { color: var(--hint); font-size: 12px; margin-left: 6px; }
+  .finding .text { margin: 8px 0; white-space: pre-wrap; }
+  .finding .docs { color: var(--hint); font-size: 12px; margin-bottom: 8px; }
+  .finding textarea {
+    width: 100%; min-height: 60px; border-radius: 8px; border: 1px solid var(--hint);
+    background: var(--bg); color: var(--text); padding: 8px; font: inherit; display: none;
+  }
+  .finding .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .finding button {
+    border: none; border-radius: 8px; padding: 8px 12px; font: inherit; cursor: pointer;
+  }
+  .btn-confirm { background: var(--ok); color: #fff; }
+  .btn-reject { background: var(--fail); color: #fff; }
+  .btn-edit { background: rgba(0,0,0,.08); color: var(--text); }
+  .btn-edit-save { background: var(--button); color: var(--button-text); display: none; }
+  .finding.decided { opacity: .55; }
+  .finding .decision-note { font-size: 12px; margin-top: 6px; }
+  .footer-bar {
+    position: sticky; bottom: 0; background: var(--bg); padding: 10px 16px;
+    border-top: 1px solid rgba(0,0,0,.08);
+  }
+  .footer-bar button {
+    width: 100%; background: var(--button); color: var(--button-text); border: none;
+    border-radius: 10px; padding: 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .footer-bar button:disabled { opacity: .5; }
+  .error-banner { background: rgba(216,75,75,.12); color: var(--fail); padding: 10px 14px; margin: 0 12px 10px; border-radius: 10px; }
+</style>
+</head>
+<body>
+
+<div id="queueScreen">
+  <header>
+    <h1>Пакеты на проверке</h1>
+    <div class="hint" id="queueHint">Загрузка…</div>
+  </header>
+  <div class="list" id="queueList"></div>
+</div>
+
+<div id="detail">
+  <div class="backbar"><button id="btnBack">← Очередь</button></div>
+  <header>
+    <h1 id="detailTitle">Пакет</h1>
+    <div class="hint" id="detailHint"></div>
+  </header>
+  <div id="detailError"></div>
+  <div id="findingsList"></div>
+  <div class="footer-bar">
+    <button id="btnFinalize">Отправить клиенту</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const initData = tg ? tg.initDataUnsafe && tg.initData : "";
+
+const STATUS_LABEL = {
+  new: "черновик", queued: "в очереди", processing: "проверяется",
+  ready_for_review: "готов к разбору", reviewed: "разобран", sent: "отправлен", error: "ошибка",
+};
+
+async function api(path, options) {
+  const resp = await fetch(path, Object.assign({
+    headers: Object.assign({"Content-Type": "application/json"},
+      initData ? {"X-Tg-Init-Data": initData} : {}),
+  }, options || {}));
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || `Ошибка ${resp.status}`);
+  return data;
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// ---------- очередь ----------
+
+async function loadQueue() {
+  const hint = document.getElementById("queueHint");
+  const list = document.getElementById("queueList");
+  try {
+    const items = await api("/api/queue");
+    hint.textContent = items.length ? `${items.length} пакет(ов)` : "";
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">Пока пусто — новые пакеты появятся здесь, как только клиенты их пришлют.</div>';
+      return;
+    }
+    list.innerHTML = items.map(renderCard).join("");
+    list.querySelectorAll(".card").forEach(el => {
+      el.addEventListener("click", () => openPackage(el.dataset.client, el.dataset.id));
+    });
+  } catch (e) {
+    hint.textContent = "";
+    list.innerHTML = `<div class="error-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function renderCard(p) {
+  const pills = Object.entries(p.findings_by_status || {})
+    .map(([status, n]) => `<span class="pill ${esc(status)}">${esc(status)} ${n}</span>`).join("");
+  const metaBits = [`файлов: ${p.files}`];
+  if (p.status === "ready_for_review") metaBits.push(`не разобрано: ${p.pending_decisions}`);
+  if (p.status === "error") metaBits.push(esc(p.error || "сбой"));
+  return `
+    <div class="card" data-client="${esc(p.client_id)}" data-id="${esc(p.id)}">
+      <div class="top">
+        <span class="client">${esc(p.client_name || p.client_id)}</span>
+        <span class="status st-${esc(p.status)}">${esc(STATUS_LABEL[p.status] || p.status)}</span>
+      </div>
+      <div class="meta">${esc(p.object_title || "")} ${metaBits.join(" · ")}</div>
+      ${pills ? `<div class="pill-row">${pills}</div>` : ""}
+    </div>`;
+}
+
+// ---------- разбор пакета ----------
+
+let current = null; // {client_id, package_id}
+
+async function openPackage(clientId, packageId) {
+  current = {clientId, packageId};
+  document.getElementById("queueScreen").style.display = "none";
+  document.getElementById("detail").style.display = "block";
+  await reloadDetail();
+}
+
+async function reloadDetail() {
+  const errBox = document.getElementById("detailError");
+  errBox.innerHTML = "";
+  try {
+    const d = await api(`/api/packages/${current.clientId}/${current.packageId}`);
+    document.getElementById("detailTitle").textContent = d.client_name || d.client_id;
+    document.getElementById("detailHint").textContent =
+      (d.object_title ? d.object_title + " · " : "") + `находок: ${d.findings.length}, не разобрано: ${d.pending_decisions}`;
+    document.getElementById("findingsList").innerHTML = d.findings.map(renderFinding).join("")
+      || '<div class="empty">Автопроверка не нашла замечаний.</div>';
+    wireFindingButtons();
+    const finalizeBtn = document.getElementById("btnFinalize");
+    finalizeBtn.disabled = d.status === "sent";
+    finalizeBtn.textContent = d.status === "reviewed" || d.status === "sent"
+      ? "Отправлено клиенту" : "Отправить клиенту";
+  } catch (e) {
+    errBox.innerHTML = `<div class="error-banner">${esc(e.message)}</div>`;
+  }
+}
+
+function renderFinding(f) {
+  const decided = f.decision !== "pending";
+  const noteByDecision = {
+    confirmed: "Подтверждено — войдёт в отчёт клиенту как есть",
+    rejected: "Отклонено — не войдёт в отчёт клиенту",
+    edited: "Подтверждено с правкой — в отчёт войдёт правка",
+  };
+  return `
+    <div class="finding ${decided ? "decided" : ""}" data-id="${esc(f.id)}">
+      <span class="badge" style="background:var(--${badgeColor(f.status)})">${esc(f.status)}</span>
+      <span class="rule">${esc(f.rule_id)}</span>
+      <div class="text">${esc(f.text)}</div>
+      ${f.source_docs && f.source_docs.length ? `<div class="docs">Документы: ${esc(f.source_docs.join(", "))}</div>` : ""}
+      <textarea placeholder="Текст замечания для клиента">${esc(f.edited_text || f.text)}</textarea>
+      <div class="actions">
+        <button class="btn-confirm" data-act="confirmed">Подтвердить</button>
+        <button class="btn-edit" data-act="toggle-edit">Править</button>
+        <button class="btn-edit-save" data-act="edited">Сохранить правку</button>
+        <button class="btn-reject" data-act="rejected">Отклонить</button>
+      </div>
+      ${decided ? `<div class="decision-note">${esc(noteByDecision[f.decision] || "")}</div>` : ""}
+    </div>`;
+}
+
+function badgeColor(status) {
+  return {FAIL: "fail", WARNING: "warn", OK: "ok", NEEDS_CONTEXT: "needs", INFO: "info"}[status] || "info";
+}
+
+function wireFindingButtons() {
+  document.querySelectorAll(".finding").forEach(el => {
+    const id = el.dataset.id;
+    const textarea = el.querySelector("textarea");
+    el.querySelector('[data-act="toggle-edit"]').addEventListener("click", () => {
+      const showing = textarea.style.display === "block";
+      textarea.style.display = showing ? "none" : "block";
+      el.querySelector('[data-act="edited"]').style.display = showing ? "none" : "inline-block";
+    });
+    el.querySelector('[data-act="confirmed"]').addEventListener("click", () => decide(id, "confirmed"));
+    el.querySelector('[data-act="rejected"]').addEventListener("click", () => decide(id, "rejected"));
+    el.querySelector('[data-act="edited"]').addEventListener("click", () => decide(id, "edited", textarea.value));
+  });
+}
+
+async function decide(findingId, decision, editedText) {
+  try {
+    await api(`/api/packages/${current.clientId}/${current.packageId}/findings/${findingId}`, {
+      method: "POST",
+      body: JSON.stringify({decision, edited_text: editedText || null}),
+    });
+    await reloadDetail();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+document.getElementById("btnFinalize").addEventListener("click", async () => {
+  try {
+    await api(`/api/packages/${current.clientId}/${current.packageId}/finalize`, {method: "POST"});
+    await reloadDetail();
+    if (tg) tg.showAlert ? tg.showAlert("Пакет готов к отправке клиенту") : alert("Пакет готов к отправке клиенту");
+  } catch (e) {
+    alert(e.message);
+  }
+});
+
+document.getElementById("btnBack").addEventListener("click", () => {
+  current = null;
+  document.getElementById("detail").style.display = "none";
+  document.getElementById("queueScreen").style.display = "block";
+  loadQueue();
+});
+
+loadQueue();
+</script>
+</body>
+</html>

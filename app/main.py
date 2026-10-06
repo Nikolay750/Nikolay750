@@ -20,10 +20,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 
-from . import config, queue_service
+from . import config, queue_service, review_service
 from .tg_auth import AuthError, check_link, sign_link, validate_init_data
 
 app = FastAPI(title="Проверка ИД — очередь оператора", docs_url=None, redoc_url=None)
@@ -86,3 +86,25 @@ def package_report(client_id: str, package_id: str, t: str):
         raise HTTPException(404, "Отчёта нет")
     return FileResponse(path, filename=f"report_{package_id[:8]}.xlsx",
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.post("/api/packages/{client_id}/{package_id}/findings/{finding_id}")
+def decide_finding(client_id: str, package_id: str, finding_id: str,
+                    body: dict = Body(...), x_tg_init_data: Optional[str] = Header(None)):
+    current_operator(x_tg_init_data)
+    try:
+        return review_service.decide_finding(
+            client_id, package_id, finding_id,
+            decision=body.get("decision", ""), edited_text=body.get("edited_text"),
+        )
+    except review_service.ReviewError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/packages/{client_id}/{package_id}/finalize")
+def finalize(client_id: str, package_id: str, x_tg_init_data: Optional[str] = Header(None)):
+    current_operator(x_tg_init_data)
+    try:
+        return review_service.finalize_review(client_id, package_id)
+    except review_service.ReviewError as e:
+        raise HTTPException(400, str(e))
