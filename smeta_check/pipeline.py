@@ -4,9 +4,9 @@
 """
 import os
 import re
-import subprocess
 
 import openpyxl
+import pdfplumber
 
 from .models import Finding
 
@@ -19,8 +19,19 @@ TYPE_LABEL = {
 
 
 def _pdf_text(path: str, pages: int = 0) -> str:
-    args = ["pdftotext", "-layout"] + (["-l", str(pages)] if pages else []) + [path, "-"]
-    return subprocess.run(args, capture_output=True, text=True, timeout=300).stdout
+    """Step 9.1: раньше вызывал внешнюю программу `pdftotext` (poppler) через
+    subprocess — на Windows её нет и не ставится через pip, из-за чего
+    classify() падал с FileNotFoundError на любом PDF. pdfplumber — чистая
+    Python-библиотека (ставится через pip install -r requirements.txt),
+    layout=True старается сохранить колонки так же, как pdftotext -layout."""
+    try:
+        with pdfplumber.open(path) as pdf:
+            pages_iter = pdf.pages[:pages] if pages else pdf.pages
+            return "\n".join(p.extract_text(layout=True) or "" for p in pages_iter)
+    except Exception:
+        # Битый/зашифрованный/нетипичный PDF — не роняем всю проверку пакета,
+        # classify() трактует пустой текст как скан (scan_pdf), это штатный путь.
+        return ""
 
 
 def classify(path: str) -> str:

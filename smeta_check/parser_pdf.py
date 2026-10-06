@@ -4,8 +4,9 @@
 поэтому каждый результат парсинга сверяется контрольными суммами (итоги разделов, «ВСЕГО по смете»).
 """
 import re
-import subprocess
 from typing import Optional
+
+import pdfplumber
 
 from .models import Document, Position, Resource
 
@@ -81,8 +82,15 @@ def n(s: str) -> Optional[float]:
 
 
 def pdf_pages(path: str) -> list:
-    out = subprocess.run(["pdftotext", "-layout", path, "-"], capture_output=True, text=True).stdout
-    return out.split("\f")
+    """Step 9.1: заменено с subprocess-вызова внешнего `pdftotext` (poppler,
+    которого нет на Windows) на pdfplumber — см. pipeline.py:_pdf_text для
+    той же замены и объяснения. "\f" между страницами — чтобы сохранить
+    прежний формат разбиения, на который рассчитан код ниже по файлу."""
+    try:
+        with pdfplumber.open(path) as pdf:
+            return [p.extract_text(layout=True) or "" for p in pdf.pages]
+    except Exception:
+        return [""]
 
 
 def _cells(s: str) -> list:
