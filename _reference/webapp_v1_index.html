@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Проверка пакета</title>
+<script src="https://telegram.org/js/telegram-web-app.js?59"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:var(--tg-theme-bg-color,#ffffff); --bg2:var(--tg-theme-secondary-bg-color,#f1f2f4);
+  --text:var(--tg-theme-text-color,#14171a); --hint:var(--tg-theme-hint-color,#7a8089);
+  --link:var(--tg-theme-link-color,#2a6fb0); --btn:var(--tg-theme-button-color,#2a6fb0);
+  --btn-text:var(--tg-theme-button-text-color,#ffffff);
+  --line:rgba(127,127,127,.32);
+  --fail:#c4352b; --warn:#b7791f; --ask:#2e5fa3; --ok:#2d7a4c; --info:var(--hint);
+  --f:"PT Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --fn:"PT Sans Narrow","PT Sans",system-ui,sans-serif;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-theme="dark"]{ --bg:#17212b; --bg2:#232e3c; --text:#f5f5f5; --hint:#708499; --link:#6ab3f3; --btn:#5288c1;
+  --fail:#ec6b60; --warn:#e0a23a; --ask:#6fa3e8; --ok:#5fbf85; }
+@supports (color:color-mix(in srgb,red 50%,blue)){:root{--line:color-mix(in srgb,var(--hint) 45%,transparent)}}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 var(--f);-webkit-text-size-adjust:100%}
+main{max-width:640px;margin:0 auto;padding:16px 16px 96px}
+h1{font-size:22px;line-height:1.2;margin:4px 0 6px;font-weight:700}
+h2{font-size:15px;margin:28px 0 8px;color:var(--hint);font-weight:400}
+p{margin:0 0 12px}
+.lead{color:var(--hint);font-size:15px;max-width:34em}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.btn{display:block;width:100%;border:0;border-radius:10px;padding:13px 16px;background:var(--btn);color:var(--btn-text);font-weight:700;cursor:pointer}
+.btn.ghost{background:var(--bg2);color:var(--link);font-weight:400}
+.btn[disabled]{opacity:.5}
+.hidden{display:none!important}
+.banner{background:var(--bg2);border-left:3px solid var(--ask);padding:8px 12px;font-size:14px;margin-bottom:14px}
+/* файлы */
+.files{list-style:none;margin:14px 0;padding:0;border-top:1px solid var(--line)}
+.files li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.files .n{overflow-wrap:anywhere}
+.files .m{grid-column:1;color:var(--hint);font-size:13px}
+.files .x{grid-row:1/3;grid-column:2;align-self:center;background:none;border:0;color:var(--hint);font-size:22px;line-height:1;padding:6px 8px;cursor:pointer}
+.field{display:block;margin:14px 0}
+.field span{display:block;font-size:14px;color:var(--hint);margin-bottom:4px}
+.field input{width:100%;font:inherit;color:var(--text);background:var(--bg2);border:0;border-radius:8px;padding:11px 12px}
+.note{font-size:13px;color:var(--hint);margin-top:8px}
+/* прогресс */
+.bar{height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;margin:14px 0 8px}
+.bar i{display:block;height:100%;width:0;background:var(--btn);transition:width .2s}
+.bar.busy i{width:35%;animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
+/* история */
+.hist{list-style:none;margin:0;padding:0}
+.hist li{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.hist .t{display:block}
+.hist .m{font-size:13px;color:var(--hint)}
+/* штамп — основная надпись */
+.stamp{border:1.5px solid var(--text);display:grid;grid-template-columns:repeat(4,1fr);margin:6px 0 18px;font-family:var(--fn)}
+.stamp > *{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 8px;min-width:0}
+.stamp .title{grid-column:1/4;font-family:var(--f);font-weight:700;font-size:16px;line-height:1.25;padding:8px}
+.stamp .date{grid-column:4;border-right:0;font-size:14px;color:var(--hint);text-align:right}
+.stamp .date b{display:block;color:var(--text);font-size:16px}
+.stamp .cell{background:none;border-top:0;border-left:0;text-align:left;cursor:pointer;position:relative}
+.stamp .cell:nth-of-type(4){border-right:0}
+.stamp .cell b{display:block;font-size:30px;line-height:1.05;font-weight:700}
+.stamp .cell span{font-size:14px;color:var(--hint)}
+.stamp .cell.fail b{color:var(--fail)} .stamp .cell.warn b{color:var(--warn)}
+.stamp .cell.ask b{color:var(--ask)} .stamp .cell.ok b{color:var(--ok)}
+.stamp .cell[aria-pressed="true"]{background:var(--bg2)}
+.stamp .cell[aria-pressed="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:currentColor;color:var(--text)}
+.stamp .money{grid-column:1/5;border-right:0;border-bottom:0;font-family:var(--f);font-size:14px;padding:8px}
+.stamp .money b{font-size:16px}
+/* вкладки */
+.tabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.tabs button{background:none;border:0;padding:8px 0;color:var(--hint);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--text);border-color:var(--text);font-weight:700}
+/* замечания */
+.fl{list-style:none;margin:0;padding:0}
+.fl li{border-bottom:1px solid var(--line)}
+.fl .row{display:block;width:100%;text-align:left;background:none;border:0;padding:11px 0 11px 14px;position:relative;cursor:pointer}
+.fl .row::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:2px;background:var(--c)}
+.fl .r{font-size:13px;color:var(--hint)}
+.fl .t{display:block;font-weight:700;line-height:1.3;margin:1px 0 2px}
+.fl .w{display:block;font-size:14px;color:var(--hint);overflow-wrap:anywhere}
+.fl .rub{float:right;font-family:var(--fn);font-size:15px;color:var(--text);margin-left:8px}
+.fl .body{padding:0 0 14px 14px;font-size:15px;overflow-wrap:anywhere}
+.fl .body .d{font-size:13px;color:var(--hint);margin-bottom:6px}
+.s-FAIL{--c:var(--fail)} .s-WARNING{--c:var(--warn)} .s-NEEDS_CONTEXT{--c:var(--ask)} .s-OK{--c:var(--ok)} .s-INFO{--c:var(--info)}
+/* план АОСР */
+.plan{width:100%;border-collapse:collapse;font-size:14px}
+.plan th{text-align:left;font-weight:400;color:var(--hint);padding:8px 6px 6px 0;border-bottom:1px solid var(--line)}
+.plan td{padding:8px 6px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.plan td.n{font-family:var(--fn);font-size:15px;width:2.2em}
+.plan td.q{text-align:right;white-space:nowrap;font-family:var(--fn);font-size:15px}
+.plan .sec{display:block;font-size:13px;color:var(--hint)}
+.empty{color:var(--hint);padding:18px 0}
+.err{color:var(--fail)}
+@media (prefers-reduced-motion:reduce){.bar.busy i{animation:none;width:100%;opacity:.5}}
+</style>
+</head>
+<body>
+<main>
+  <div id="demoBanner" class="banner hidden">Демо-режим: данные обезличены, файлы никуда не отправляются.</div>
+
+  <!-- 1. Новая проверка -->
+  <section id="vHome">
+    <h1>Проверка пакета</h1>
+    <p class="lead">Смета и акты КС-2 в Excel или договор с ВОР и ЛСР в PDF. Найду расхождения в объёмах, ценах, коэффициентах, НДС и материалах.</p>
+    <ul class="files" id="fileList" aria-live="polite"></ul>
+    <input type="file" id="picker" multiple accept=".xlsx,.xlsm,.xls,.pdf" class="hidden">
+    <button class="btn ghost" id="addBtn">Добавить файлы</button>
+    <p class="note" id="limitNote">До 500 МБ на пакет. Сканы без текстового слоя пока не распознаются.</p>
+    <label class="field"><span>Название проверки, необязательно</span>
+      <input id="title" maxlength="120" placeholder="Например: Гараж, КС-2 за сентябрь"></label>
+    <button class="btn" id="runBtnInline">Проверить пакет</button>
+    <h2 id="histHead" class="hidden">Прошлые проверки</h2>
+    <ul class="hist" id="hist"></ul>
+  </section>
+
+  <!-- 2. Загрузка и проверка -->
+  <section id="vWait" class="hidden">
+    <h1 id="waitTitle">Загружаем файлы</h1>
+    <div class="bar" id="bar"><i></i></div>
+    <p class="lead" id="waitNote"></p>
+  </section>
+
+  <!-- 3. Результат -->
+  <section id="vResult" class="hidden">
+    <div class="stamp" id="stamp"></div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button role="tab" aria-selected="true" data-tab="f">Замечания</button>
+      <button role="tab" aria-selected="false" data-tab="p" id="planTab" class="hidden">План АОСР</button>
+      <button role="tab" aria-selected="false" data-tab="d">Файлы</button>
+    </div>
+    <ul class="fl" id="fl"></ul>
+    <div id="planBox" class="hidden"></div>
+    <ul class="files hidden" id="resFiles"></ul>
+    <button class="btn" id="dlInline" style="margin-top:18px">Скачать отчёт Excel</button>
+    <button class="btn ghost" id="newInline" style="margin-top:10px">Новая проверка</button>
+  </section>
+
+  <section id="vOutside" class="hidden">
+    <h1>Откройте через бота</h1>
+    <p class="lead">Приложение работает внутри Telegram: так мы знаем, чьи это файлы, и никто другой их не увидит.</p>
+  </section>
+</main>
+
+<script>
+"use strict";
+const DEMO_JOB = {"id": "demo0000000000000000000000000000", "title": "", "status": "done", "finished": null, "result": {"mode": "contract", "title": "Договор № 00-ДЕМО/2026: договор ↔ ЛСР ↔ ВОР ↔ ТЗ", "files": [{"name": "Договор_с_приложениями.pdf", "type": "contract_pdf", "label": "Договор с приложениями", "size": 1910895}, {"name": "Смета_контракта.xlsx", "type": "smeta_contract_xlsx", "label": "Смета контракта", "size": 13070}, {"name": "Скан_ИД_электромонтаж.pdf", "type": "scan_pdf", "label": "Скан (без текста)", "size": 88076492}], "counts": {"FAIL": 2, "WARNING": 2, "NEEDS_CONTEXT": 9, "INFO": 2, "OK": 4}, "over_rub": 0, "over_contract_rub": null, "under_rub": 0, "findings": [{"rule": "C-02", "status": "FAIL", "title": "НДС в договоре и в смете разный — база для КС-2 не определена", "docs": "Договор п. 2.1, прил. 1 ↔ ЛСР (прил. 7), смета контракта", "where": "итоги", "text": "Договор: НДС 5% (5/105) = 440 666.67, цена без НДС 8 813 333.33. ЛСР и смета контракта: НДС 22% = 1 668 754.10, цена без НДС 7 585 245.90. Разница в базе без НДС: 1 228 087.43 руб. Оплата — «100% по фактическому объёму». Если КС-2 считать по ЛСР без НДС и начислить 5%, максимум к оплате 7 964 508.20 — на 1 289 491.80 меньше цены договора. Чтобы выйти на цену договора, в КС-2 нужен пересчётный коэффициент 1.161905 (= 1.22/1.05) — в договоре он не прописан. Способ расчёта стоимости в КС-2/КС-3 зафиксировать письменно с заказчиком ДО первого акта.", "rub": 1228087.43}, {"rule": "V-03", "status": "FAIL", "title": "Объём в ЛСР не равен объёму ВОР", "docs": "ВОР ↔ ЛСР", "where": "ВОР п. 186 → ЛСР поз. 186", "text": "«Грунтовка укрепляющая, глубокого проникновения, быстросохнущ»: ВОР 2 кг, ЛСР 20 кг (= 20 кг).", "rub": 1667.34}, {"rule": "C-03", "status": "WARNING", "title": "Итоги ЛСР по коэффициенту снижения не сходятся между собой", "docs": "ЛСР «ЛСР (прил. 7)»", "where": "итоги", "text": "Напечатан k = 0.8173069881: Всего × k = 7 585 304.27. Строка снижения -1 695 602.17: Всего − снижение = 7 585 248.70. Итог «Всего с учётом…» = 7 585 245.90. Фактически применённый k = 0.8173006986. Сметная стоимость с НДС 22% была бы 11 322 638.06; она урезана на 18.3% до суммы финансирования. k «некруглый» — получен делением лимита на сметную стоимость. Если в КС-2 взять напечатанный k, акт на 100% объёма превысит цену договора на 71.21 с НДС — ПИК ЕАСУЗ/экспертиза может вернуть документ. Согласовать с заказчиком, каким k считать акты (практично — тем, что даёт итог сметы).", "rub": 58.37}, {"rule": "H-01", "status": "WARNING", "title": "Разные диаметры труб и комплектующих в одной позиции", "docs": "ЛСР «ЛСР (прил. 7)», стр. 4102", "where": "поз. 292 «Труба гофрированная ПВХ для защиты проводов и кабе»", "text": "«Трубы гибкие гофрированные, легкие, из самозатухающего ПВХ, с зондом, » (Ø40) и «Держатели пластмассовые для труб диаметром 32 мм с защелкой и дюбелем » (Ø32, 8). Трубы и фасонные части/крепёж одной системы должны быть одного типоразмера — иначе в смете оплачен комплект, который нельзя смонтировать. Эвристика: подтвердить по ТЗ.", "rub": null}, {"rule": "H-02", "status": "NEEDS_CONTEXT", "title": "Масса мусора к вывозу не подтверждена расчётом", "docs": "ЛСР «ЛСР (прил. 7)»", "where": "поз. 217, 218, 219, 257, 351", "text": "По нормативным ресурсам демонтажа (999-9900) образуется 58.932 т, к погрузке/вывозу принято 62.962 т. Разница может быть законной (масса окон, дверей и т.п. по отдельному расчёту), но расчёт массы мусора не приложен.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3225", "where": "поз. 225 «Огрунтовка металлических поверхностей за один»", "text": "По норме нужен неучтённый материал: 14.5.09.07 «Растворители» 0.0025 т. Мелочь: растворитель для ЛКМ по норме не оценён — расход небольшой, но покупать его подрядчику.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3257", "where": "поз. 227 «Окраска металлических огрунтованных поверхнос»", "text": "По норме нужен неучтённый материал: 14.5.09.07 «Растворители» 0.0015 т. Мелочь: растворитель для ЛКМ по норме не оценён — расход небольшой, но покупать его подрядчику.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3291", "where": "поз. 229 «Прокладка внутренних трубопроводов водоснабже»", "text": "По норме нужен неучтённый материал: 24.1.02.01 «Хомуты для крепления труб» 16.1590 10 шт. Материал по технологии нужен, а отдельной позиции с ним нет — подрядчик поставит его за свой счёт (в цене договора его нет), либо он заменён без явной связи. Проверить по ТЗ и факту.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3350", "where": "поз. 236 «Установка вентилей, задвижек, затворов, клапа»", "text": "По норме нужен неучтённый материал: 18.1.02.01 «Арматура трубопроводная фланцевая» 2.0000 шт; 23.8.03.11 «Фланцы стальные» 4.0000 шт. Норма рассчитана на фланцевое присоединение (в её составе фланцы), а заложены муфтовые краны/сгоны — фланцы физически не нужны, поэтому их нет. Но тогда расценка подобрана не под изделие: трудозатраты фланцевого монтажа оплачиваются за муфтовую сборку. Вопрос к сметчику заказчика; при проверке КС-2 экспертиза может снять разницу.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3392", "where": "поз. 239 «Установка вентилей, задвижек, затворов, клапа»", "text": "По норме нужен неучтённый материал: 23.8.03.11 «Фланцы стальные» 32.0000 шт. Норма рассчитана на фланцевое присоединение (в её составе фланцы), а заложены муфтовые краны/сгоны — фланцы физически не нужны, поэтому их нет. Но тогда расценка подобрана не под изделие: трудозатраты фланцевого монтажа оплачиваются за муфтовую сборку. Вопрос к сметчику заказчика; при проверке КС-2 экспертиза может снять разницу.", "rub": null}, {"rule": "H-04", "status": "NEEDS_CONTEXT", "title": "Материал нормы не оценён в смете", "docs": "ЛСР «ЛСР (прил. 7)», стр. 3472", "where": "поз. 245 «Установка фланцевых соединений на стальных»", "text": "По норме нужен неучтённый материал: 23.8.03.11 «Фланцы стальные» 2.0000 шт. Норма рассчитана на фланцевое присоединение (в её составе фланцы), а заложены муфтовые краны/сгоны — фланцы физически не нужны, поэтому их нет. Но тогда расценка подобрана не под изделие: трудозатраты фланцевого монтажа оплачиваются за муфтовую сборку. Вопрос к сметчику заказчика; при проверке КС-2 экспертиза может снять разницу.", "rub": null}, {"rule": "IN-01", "status": "NEEDS_CONTEXT", "title": "Скан без текстового слоя", "docs": "Скан_ИД_электромонтаж.pdf", "where": "—", "text": "Распознавание сканов (OCR) в этой версии не выполняется. Если есть исходник (xlsx из сметной программы или PDF, сохранённый из программы), загрузите его.", "rub": null}, {"rule": "Z-02", "status": "NEEDS_CONTEXT", "title": "Работы, похожие на скрытые, но не включённые в перечень ТЗ", "docs": "ЛСР ↔ ТЗ прил. 9", "where": "1 поз.", "text": "поз. 225 «Огрунтовка металлических поверхностей за один раз: грун» (Отопление). По договору АОСР на них не требуются, но при приёмке стройконтроль может их запросить (СП 543 — рекомендательно). Решить заранее: оформлять или согласовать отказ.", "rub": null}, {"rule": "V-05", "status": "INFO", "title": "Объёмы в ВОР в основном не обоснованы расчётом", "docs": "ВОР", "where": "графа «Формула расчёта»", "text": "У 308 из 351 позиций в графе «Формула» стоит само число (часто округлённое: «0» при 0,0132 т), а не расчёт. Без РД это единственное обоснование объёмов. При приёмке по фактическому объёму спор об объёме решать будет нечем — подрядчику стоит вести свои обмеры с фотофиксацией (ТЗ прил. 6) с первого дня.", "rub": null}, {"rule": "Z-03", "status": "INFO", "title": "Перечень скрытых работ собран из строк сметы механически", "docs": "ТЗ прил. 9", "where": "п. 1 + п. 2 (ЛСР поз. 2 и 4); п. 31 + п. 32 (ЛСР поз. 195 и 197)", "text": "Добавочная расценка «на каждые N мм изменения толщины» — это та же стяжка, а не отдельная работа: физически один слой и одно освидетельствование. По перечню это два АОСР с одинаковыми датами и объёмом — верификатор ИД такое подсветит (правило 4), стройконтроль тоже. Предложить заказчику оформлять один АОСР на итоговую толщину со ссылкой на обе позиции.", "rub": null}, {"rule": "C-01", "status": "OK", "title": "Цена договора совпадает во всех документах", "docs": "Договор ↔ ЛСР ↔ смета контракта", "where": "—", "text": "Цена договора (п. 2.1): 9 254 000.00; ВСЕГО по ЛСР (прил. 7): 9 254 000.00; Смета контракта (xlsx): 9 254 000.00; Источники финансирования (п. 2.4): 9 254 000.00", "rub": null}, {"rule": "H-03", "status": "OK", "title": "Количество материалов сверено с нормами ГЭСН", "docs": "ЛСР «ЛСР (прил. 7)»", "where": "—", "text": "Строк неучтённых материалов в нормах: 109, сверено по количеству: 102. Отклонений больше ±33% не найдено.", "rub": null}, {"rule": "S-05", "status": "OK", "title": "Арифметика ЛСР сходится", "docs": "ЛСР «ЛСР (прил. 7)»", "where": "—", "text": "351 позиций: объём×коэф., цена×объём, 15 итогов разделов, «Всего», снижение, НДС, «ВСЕГО по смете».", "rub": null}, {"rule": "Z-01", "status": "OK", "title": "Перечень скрытых работ привязан к смете: 54 из 54", "docs": "ТЗ прил. 9 ↔ ЛСР", "where": "—", "text": "По договору (ТЗ, прил. 9) обязательно 54 АОСР — это уровень «обязательно по договору». Привязка «п. перечня → позиция ЛСР → объём из ВОР» — на листе «План АОСР»; её можно сразу отдать генератору актов.", "rub": null}], "plan": [{"n": 1, "name": "Устройство стяжек: бетонных толщиной 20 мм", "lsr": "2", "section": "Раздел 1. Основной гараж", "qty": 115.0, "unit": "м2", "score": 1.0}, {"n": 2, "name": "Устройство стяжек: на каждые 5 мм изменения толщины стяжки добавлять или исключать к норме 11-01-011-03 Толщиной 100 мм", "lsr": "4", "section": "Раздел 1. Основной гараж", "qty": 115.0, "unit": "м2", "score": 0.93}, {"n": 3, "name": "Армирование стяжек сетками сварными", "lsr": "6", "section": "Раздел 1. Основной гараж", "qty": 115.0, "unit": "м2", "score": 1.0}, {"n": 4, "name": "Кладка отдельных участков кирпичных стен и заделка проемов в кирпичных стенах при объеме кладки в одном месте: до 5 м3", "lsr": "14", "section": "Раздел 1. Основной гараж", "qty": 3.2, "unit": "м3", "score": 1.0}, {"n": 5, "name": "Установка противопожарных дверей: однопольных глухих", "lsr": "24", "section": "Раздел 1. Основной гараж", "qty": 3.78, "unit": "м2", "score": 1.0}, {"n": 6, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "28", "section": "Раздел 2. Мастерская", "qty": 40.0, "unit": "м2", "score": 1.0}, {"n": 7, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "39", "section": "Раздел 2. Мастерская", "qty": 103.0, "unit": "м2", "score": 1.0}, {"n": 8, "name": "Кладка отдельных участков кирпичных стен и заделка проемов в кирпичных стенах при объеме кладки в одном месте: до 5 м3", "lsr": "44", "section": "Раздел 2. Мастерская", "qty": 2.0, "unit": "м3", "score": 1.0}, {"n": 9, "name": "Установка в жилых и общественных зданиях оконных блоков из ПВХ профилей: поворотных (откидных, поворотно-откидных) с площадью проема более 2 м2 двухстворчатых", "lsr": "49", "section": "Раздел 2. Мастерская", "qty": 2.4705, "unit": "м2", "score": 1.0}, {"n": 10, "name": "Установка блоков из ПВХ в наружных и внутренних дверных проемах: в каменных стенах площадью проема более 3 м2", "lsr": "56", "section": "Раздел 2. Мастерская", "qty": 3.615, "unit": "м2", "score": 1.0}, {"n": 11, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "60", "section": "Раздел 3. Комната механика", "qty": 11.0, "unit": "м2", "score": 1.0}, {"n": 12, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "70", "section": "Раздел 3. Комната механика", "qty": 50.0, "unit": "м2", "score": 1.0}, {"n": 13, "name": "Установка в жилых и общественных зданиях оконных блоков из ПВХ профилей: поворотных (откидных, поворотно-откидных) с площадью проема до 2 м2 двухстворчатых", "lsr": "78", "section": "Раздел 3. Комната механика", "qty": 2.1168, "unit": "м2", "score": 1.0}, {"n": 14, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "86", "section": "Раздел 4. Помещение для персонала", "qty": 78.0, "unit": "м2", "score": 1.0}, {"n": 15, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "97", "section": "Раздел 4. Помещение для персонала", "qty": 370.0, "unit": "м2", "score": 1.0}, {"n": 16, "name": "Кладка отдельных участков кирпичных стен и заделка проемов в кирпичных стенах при объеме кладки в одном месте: до 5 м3", "lsr": "106", "section": "Раздел 4. Помещение для персонала", "qty": 4.0, "unit": "м3", "score": 1.0}, {"n": 17, "name": "Установка блоков из ПВХ в наружных и внутренних дверных проемах: в каменных стенах площадью проема до 3 м2", "lsr": "110", "section": "Раздел 4. Помещение для персонала", "qty": 17.22, "unit": "м2", "score": 1.0}, {"n": 18, "name": "Ремонт отмостки: бетонной толщиной 15 см", "lsr": "118", "section": "Раздел 5. Фасад", "qty": 60.0, "unit": "м2", "score": 1.0}, {"n": 19, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "122", "section": "Раздел 6. Гараж № 1", "qty": 19.0, "unit": "м2", "score": 1.0}, {"n": 20, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "131", "section": "Раздел 7. Гараж № 2", "qty": 19.0, "unit": "м2", "score": 1.0}, {"n": 21, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "140", "section": "Раздел 8. Гараж № 5", "qty": 39.0, "unit": "м2", "score": 1.0}, {"n": 22, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "149", "section": "Раздел 8. Гараж № 5", "qty": 100.0, "unit": "м2", "score": 1.0}, {"n": 23, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "154", "section": "Раздел 9. Гараж № 6-7", "qty": 78.0, "unit": "м2", "score": 1.0}, {"n": 24, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "163", "section": "Раздел 9. Гараж № 6-7", "qty": 137.0, "unit": "м2", "score": 1.0}, {"n": 25, "name": "Кладка отдельных участков кирпичных стен и заделка проемов в кирпичных стенах при объеме кладки в одном месте: до 5 м3", "lsr": "168", "section": "Раздел 9. Гараж № 6-7", "qty": 4.0, "unit": "м3", "score": 1.0}, {"n": 26, "name": "Изоляция изделиями из волокнистых и зернистых материалов с креплением на клее и дюбелями холодных поверхностей: наружных стен", "lsr": "170", "section": "Раздел 9. Гараж № 6-7", "qty": 60.0, "unit": "м2", "score": 1.0}, {"n": 27, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "173", "section": "Раздел 10. Гараж № 8", "qty": 39.0, "unit": "м2", "score": 1.0}, {"n": 28, "name": "Наклеивание сетки штукатурной стеклотканевой по готовому основанию", "lsr": "182", "section": "Раздел 10. Гараж № 8", "qty": 100.0, "unit": "м2", "score": 1.0}, {"n": 29, "name": "Устройство стяжек: цементно-песчаных из полусухого раствора толщиной 50 мм", "lsr": "187", "section": "Раздел 11. Деревянный склад", "qty": 80.0, "unit": "м2", "score": 1.0}, {"n": 30, "name": "Устройство пароизоляции из полиэтиленовой пленки в один слой насухо", "lsr": "194", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 1.0}, {"n": 31, "name": "Устройство выравнивающих стяжек: цементно-песчаных толщиной 15 мм", "lsr": "195", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 1.0}, {"n": 32, "name": "Устройство выравнивающих стяжек: на каждый 1 мм изменения толщины добавлять или исключать к норме 12-01-017-01 Толщиной 50 мм", "lsr": "197", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 0.91}, {"n": 33, "name": "Армирование стяжек сетками сварными", "lsr": "199", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 1.0}, {"n": 34, "name": "Огрунтовка оснований из бетона или раствора под водоизоляционный кровельный ковер: готовой эмульсией битумной", "lsr": "202", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 1.0}, {"n": 35, "name": "Устройство кровель плоских из наплавляемых материалов: в два слоя", "lsr": "204", "section": "Раздел 12. Кровля", "qty": 560.0, "unit": "м2", "score": 1.0}, {"n": 36, "name": "Установка стропил", "lsr": "209", "section": "Раздел 12. Кровля", "qty": 2.56, "unit": "м3", "score": 1.0}, {"n": 37, "name": "Устройство обрешетки с прозорами из брусков", "lsr": "211", "section": "Раздел 12. Кровля", "qty": 155.0, "unit": "м2", "score": 1.0}, {"n": 38, "name": "Устройство пароизоляции из полиэтиленовой пленки в один слой насухо", "lsr": "213", "section": "Раздел 12. Кровля", "qty": 155.0, "unit": "м2", "score": 1.0}, {"n": 39, "name": "Прокладка трубопроводов отопления из стальных водогазопроводных неоцинкованных труб диаметром: 50 мм", "lsr": "221", "section": "Раздел 14. Отопление", "qty": 30.0, "unit": "м", "score": 1.0}, {"n": 40, "name": "Прокладка внутренних трубопроводов водоснабжения и отопления из многослойных полипропиленовых труб, из заранее собранных узлов, наружным диаметром: 25 мм", "lsr": "229", "section": "Раздел 14. Отопление", "qty": 113.0, "unit": "м", "score": 1.0}, {"n": 41, "name": "Труба гофрированная ПВХ для защиты проводов и кабелей по установленным конструкциям, по стенам, колоннам, потолкам, основанию пола", "lsr": "292", "section": "Раздел 15. Электромонтажные работы", "qty": 2.0, "unit": "м", "score": 1.0}, {"n": 42, "name": "Затягивание провода в проложенные трубы и металлические рукава первого одножильного или многожильного в общей оплетке, суммарное сечение: до 70 мм2", "lsr": "295", "section": "Раздел 15. Электромонтажные работы", "qty": 2.0, "unit": "м", "score": 1.0}, {"n": 43, "name": "Труба гофрированная ПВХ для защиты проводов и кабелей по установленным конструкциям, по стенам, колоннам, потолкам, основанию пола", "lsr": "300", "section": "Раздел 15. Электромонтажные работы", "qty": 308.0, "unit": "м", "score": 1.0}, {"n": 44, "name": "Затягивание провода в проложенные трубы и металлические рукава первого одножильного или многожильного в общей оплетке, суммарное сечение: до 2,5 мм2", "lsr": "303", "section": "Раздел 15. Электромонтажные работы", "qty": 308.0, "unit": "м", "score": 1.0}, {"n": 45, "name": "Затягивание провода в проложенные трубы и металлические рукава каждого последующего одножильного или многожильного в общей оплетке, суммарное сечение: до 6 мм2", "lsr": "304", "section": "Раздел 15. Электромонтажные работы", "qty": 270.0, "unit": "м", "score": 1.0}, {"n": 46, "name": "Труба гофрированная ПВХ для защиты проводов и кабелей по установленным конструкциям, по стенам, колоннам, потолкам, основанию пола", "lsr": "306", "section": "Раздел 15. Электромонтажные работы", "qty": 150.0, "unit": "м", "score": 1.0}, {"n": 47, "name": "Затягивание провода в проложенные трубы и металлические рукава первого одножильного или многожильного в общей оплетке, суммарное сечение: до 6 мм2", "lsr": "309", "section": "Раздел 15. Электромонтажные работы", "qty": 150.0, "unit": "м", "score": 1.0}, {"n": 48, "name": "Затягивание провода в проложенные трубы и металлические рукава каждого последующего одножильного или многожильного в общей оплетке, суммарное сечение: до 6 мм2", "lsr": "310", "section": "Раздел 15. Электромонтажные работы", "qty": 144.0, "unit": "м", "score": 1.0}, {"n": 49, "name": "Труба гофрированная ПВХ для защиты проводов и кабелей по установленным конструкциям, по стенам, колоннам, потолкам, основанию пола", "lsr": "312", "section": "Раздел 15. Электромонтажные работы", "qty": 161.0, "unit": "м", "score": 1.0}, {"n": 50, "name": "Затягивание провода в проложенные трубы и металлические рукава первого одножильного или многожильного в общей оплетке, суммарное сечение: до 16 мм2", "lsr": "315", "section": "Раздел 15. Электромонтажные работы", "qty": 161.0, "unit": "м", "score": 1.0}, {"n": 51, "name": "Затягивание провода в проложенные трубы и металлические рукава каждого последующего одножильного или многожильного в общей оплетке, суммарное сечение: до 35 мм2", "lsr": "316", "section": "Раздел 15. Электромонтажные работы", "qty": 219.0, "unit": "м", "score": 1.0}, {"n": 52, "name": "Заземлитель горизонтальный из стали: полосовой сечением 160 мм2", "lsr": "341", "section": "Раздел 15. Электромонтажные работы", "qty": 340.0, "unit": "м", "score": 0.93}, {"n": 53, "name": "Заземлитель горизонтальный из стали: круглой диаметром 12 мм", "lsr": "347", "section": "Раздел 15. Электромонтажные работы", "qty": 24.0, "unit": "м", "score": 0.95}, {"n": 54, "name": "Заземлитель вертикальный из угловой стали размером: 50х50х5 мм", "lsr": "349", "section": "Раздел 15. Электромонтажные работы", "qty": 3.0, "unit": "шт", "score": 0.9}], "report": "report.xlsx"}};
+
+const tg = window.Telegram && window.Telegram.WebApp;
+const qs = new URLSearchParams(location.search);
+const DEMO = qs.get("demo") === "1" || location.protocol === "file:";   // открыли файл с диска — показываем демо
+const INSIDE = !!(tg && tg.initData);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rub = v => (Math.round(v)).toLocaleString("ru-RU").replace(/,/g, " ") + " ₽";
+const mb = b => b < 1048576 ? Math.max(1, Math.round(b / 1024)) + " КБ"
+  : (b / 1048576).toLocaleString("ru-RU", {maximumFractionDigits: b < 10485760 ? 1 : 0}) + " МБ";
+const STATUS = {FAIL:"Ошибка", WARNING:"Замечание", NEEDS_CONTEXT:"Уточнить", INFO:"Справочно", OK:"В норме"};
+let files = [], current = null, filter = null, pollTimer = null;
+
+/* ---------- Telegram-обвязка ---------- */
+function setupTelegram() {
+  if (qs.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+  if (!tg) return;
+  tg.ready(); tg.expand();
+  if (tg.colorScheme === "dark") document.documentElement.dataset.theme = "dark";
+  tg.onEvent("themeChanged", () => { document.documentElement.dataset.theme = tg.colorScheme === "dark" ? "dark" : "light"; });
+  tg.BackButton.onClick(() => show("vHome"));
+}
+function mainButton(text, handler) {
+  // В Telegram — нативная кнопка внизу; вне Telegram — кнопка в разметке.
+  const inline = {"Проверить пакет": $("runBtnInline"), "Скачать отчёт Excel": $("dlInline")}[text];
+  if (INSIDE) {
+    if (inline) inline.classList.add("hidden");
+    tg.MainButton.offClick(mainButton._h || (() => {}));
+    if (!text) { tg.MainButton.hide(); return; }
+    mainButton._h = handler; tg.MainButton.setText(text); tg.MainButton.onClick(handler); tg.MainButton.show();
+  }
+}
+const haptic = t => { try { tg && tg.HapticFeedback.notificationOccurred(t); } catch (e) {} };
+
+function show(view) {
+  for (const v of ["vHome","vWait","vResult","vOutside"]) $(v).classList.toggle("hidden", v !== view);
+  if (pollTimer && view !== "vWait") { clearTimeout(pollTimer); pollTimer = null; }
+  if (tg && INSIDE) (view === "vResult") ? tg.BackButton.show() : tg.BackButton.hide();
+  if (view === "vHome") { mainButton(files.length ? "Проверить пакет" : "", run); renderFiles(); loadHistory(); }
+  else if (view === "vResult") mainButton(current && current.report_url || DEMO ? "Скачать отчёт Excel" : "", download);
+  else mainButton("", null);
+  window.scrollTo(0, 0);
+}
+
+/* ---------- API ---------- */
+async function api(path, opts = {}) {
+  const r = await fetch(path, {...opts, headers: {...(opts.headers || {}), "X-Tg-Init-Data": tg ? tg.initData : ""}});
+  if (!r.ok) {
+    let msg = `Ошибка ${r.status}`;
+    try { msg = (await r.json()).detail || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+/* ---------- 1. Файлы ---------- */
+function renderFiles() {
+  $("fileList").innerHTML = files.map((f, i) =>
+    `<li><span class="n">${esc(f.name)}</span><span class="m">${mb(f.size)}</span>
+     <button class="x" data-i="${i}" aria-label="Убрать ${esc(f.name)}">×</button></li>`).join("");
+  $("addBtn").textContent = files.length ? "Добавить ещё" : "Добавить файлы";
+  $("runBtnInline").disabled = !files.length;
+  if ($("vHome").offsetParent !== null) mainButton(files.length ? "Проверить пакет" : "", run);
+}
+$("addBtn").onclick = () => $("picker").click();
+$("picker").onchange = e => {
+  for (const f of e.target.files) if (!files.some(x => x.name === f.name && x.size === f.size)) files.push(f);
+  e.target.value = ""; renderFiles();
+};
+$("fileList").onclick = e => { const i = e.target.dataset.i; if (i !== undefined) { files.splice(+i, 1); renderFiles(); } };
+$("runBtnInline").onclick = () => run();
+$("dlInline").onclick = () => download();
+$("newInline").onclick = () => { files = []; $("title").value = ""; show("vHome"); };
+
+async function loadHistory() {
+  if (DEMO || !INSIDE) return;
+  try {
+    const list = await api("/api/jobs");
+    $("histHead").classList.toggle("hidden", !list.length);
+    $("hist").innerHTML = list.map(j => {
+      const c = j.counts;
+      const st = j.status === "done" ? `ошибок ${c.FAIL}, замечаний ${c.WARNING}` :
+                 j.status === "error" ? "не выполнилась" : "идёт проверка";
+      return `<li data-id="${esc(j.id)}" tabindex="0"><span class="t">${esc(j.title)}</span>
+              <span class="m">${new Date(j.created * 1000).toLocaleDateString("ru-RU")}, ${st}</span></li>`;
+    }).join("");
+  } catch (e) { /* история не критична */ }
+}
+$("hist").onclick = e => { const li = e.target.closest("li"); if (li) openJob(li.dataset.id); };
+
+/* ---------- 2. Загрузка и ожидание ---------- */
+function run() {
+  if (!files.length) return;
+  show("vWait"); $("waitTitle").textContent = "Загружаем файлы";
+  const total = files.reduce((s, f) => s + f.size, 0);
+  $("bar").classList.remove("busy"); $("bar").firstElementChild.style.width = "0";
+  $("waitNote").textContent = `0 из ${mb(total)}`;
+  if (DEMO) return demoRun(total);
+  const fd = new FormData();
+  files.forEach(f => fd.append("files", f, f.name));
+  fd.append("title", $("title").value);
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/jobs");
+  xhr.setRequestHeader("X-Tg-Init-Data", tg ? tg.initData : "");
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    $("bar").firstElementChild.style.width = (100 * e.loaded / e.total).toFixed(1) + "%";
+    $("waitNote").textContent = `${mb(e.loaded)} из ${mb(e.total)}`;
+  };
+  xhr.onload = () => {
+    let body = {}; try { body = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status !== 200) return fail(body.detail || `Загрузка не прошла (код ${xhr.status})`);
+    checking(); poll(body.id);
+  };
+  xhr.onerror = () => fail("Связь прервалась во время загрузки. Проверьте интернет и отправьте пакет ещё раз.");
+  xhr.send(fd);
+}
+function checking() {
+  $("waitTitle").textContent = "Проверяем пакет";
+  $("bar").classList.add("busy");
+  $("waitNote").textContent = "Договор на 150 страниц проверяется около минуты. Можно закрыть приложение — бот пришлёт сообщение, когда отчёт будет готов.";
+}
+async function poll(id) {
+  try {
+    const job = await api(`/api/jobs/${encodeURIComponent(id)}`);
+    if (job.status === "done") return showResult(job);
+    if (job.status === "error") return fail(job.error);
+    pollTimer = setTimeout(() => poll(id), 2000);
+  } catch (e) { fail(e.message); }
+}
+async function openJob(id) {
+  show("vWait"); checking();
+  poll(id);
+}
+function fail(msg) {
+  haptic("error");
+  show("vHome");
+  $("limitNote").innerHTML = `<span class="err">${esc(msg)}</span>`;
+}
+
+/* ---------- 3. Результат ---------- */
+function showResult(job) {
+  current = job; filter = null;
+  const r = job.result, c = r.counts;
+  haptic(c.FAIL ? "warning" : "success");
+  const d = new Date((job.finished || Date.now() / 1000) * 1000);
+  let money = "";
+  if (r.over_rub) money += `Возможное завышение <b>${rub(r.over_rub)}</b> прямых затрат` +
+                           (r.over_contract_rub ? `, ≈ ${rub(r.over_contract_rub)} в ценах договора` : "") + ". ";
+  if (r.under_rub) money += `Недооценено ${rub(r.under_rub)}.`;
+  const cells = [["FAIL","fail","ошибки"],["WARNING","warn","замечания"],["NEEDS_CONTEXT","ask","уточнить"],["OK","ok","в норме"]];
+  $("stamp").innerHTML =
+    `<div class="title">${esc(job.title || r.title)}</div>
+     <div class="date">дата<b>${d.toLocaleDateString("ru-RU", {day:"2-digit", month:"2-digit"})}</b></div>` +
+    cells.map(([k, cls, label]) => `<button class="cell ${cls}" data-k="${k}" aria-pressed="false"
+        aria-label="${label}: ${c[k]}, показать только их"><b>${c[k]}</b><span>${label}</span></button>`).join("") +
+    (money ? `<div class="money">${money}</div>` : "");
+  $("planTab").classList.toggle("hidden", !r.plan);
+  if (r.plan) $("planTab").textContent = `План АОСР (${r.plan.length})`;
+  $("resFiles").innerHTML = r.files.map(f =>
+    `<li><span class="n">${esc(f.name)}</span><span class="m">${esc(f.label)}, ${mb(f.size)}</span></li>`).join("");
+  $("dlInline").classList.toggle("hidden", INSIDE || !(job.report_url || DEMO));
+  selectTab("f"); renderFindings(); show("vResult");
+}
+$("stamp").onclick = e => {
+  const b = e.target.closest(".cell"); if (!b) return;
+  filter = filter === b.dataset.k ? null : b.dataset.k;
+  for (const x of $("stamp").querySelectorAll(".cell")) x.setAttribute("aria-pressed", x.dataset.k === filter);
+  selectTab("f"); renderFindings();
+};
+function renderFindings() {
+  const list = current.result.findings.filter(f => !filter || f.status === filter);
+  $("fl").innerHTML = list.length ? list.map((f, i) =>
+    `<li class="s-${f.status}"><button class="row" aria-expanded="false" data-i="${i}">
+       ${f.rub ? `<span class="rub">${f.rule.startsWith("H") ? (f.rub > 0 ? "+" : "−") : ""}${rub(Math.abs(f.rub))}</span>` : ""}
+       <span class="r">${esc(f.rule)}, ${STATUS[f.status]}</span>
+       <span class="t">${esc(f.title)}</span>
+       ${f.where && f.where !== "—" ? `<span class="w">${esc(f.where)}</span>` : ""}
+     </button>
+     <div class="body hidden"><div class="d">${esc(f.docs)}</div>${esc(f.text)}</div></li>`).join("")
+    : `<li class="empty">В этой категории ничего нет.</li>`;
+}
+$("fl").onclick = e => {
+  const b = e.target.closest(".row"); if (!b) return;
+  const open = b.getAttribute("aria-expanded") !== "true";
+  b.setAttribute("aria-expanded", open); b.nextElementSibling.classList.toggle("hidden", !open);
+};
+function selectTab(t) {
+  for (const b of $("tabs").querySelectorAll("button")) b.setAttribute("aria-selected", b.dataset.tab === t);
+  $("fl").classList.toggle("hidden", t !== "f");
+  $("planBox").classList.toggle("hidden", t !== "p");
+  $("resFiles").classList.toggle("hidden", t !== "d");
+  if (t === "p") renderPlan();
+}
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) selectTab(b.dataset.tab); };
+function renderPlan() {
+  const p = current.result.plan || [];
+  $("planBox").innerHTML = `<p class="note">Скрытые работы из ТЗ, привязанные к позициям сметы и объёмам ВОР. По каждой строке нужен АОСР.</p>
+   <table class="plan"><thead><tr><th>№</th><th>Работа</th><th style="text-align:right">Объём</th></tr></thead><tbody>` +
+   p.map(x => `<tr><td class="n">${x.n}</td><td>${esc(x.name)}<span class="sec">поз. сметы ${esc(x.lsr || "не найдена")}, ${esc((x.section || "").replace(/^Раздел \d+\.\s*/, ""))}</span></td>
+     <td class="q">${x.qty != null ? (+x.qty).toLocaleString("ru-RU") + " " + esc(x.unit) : "—"}</td></tr>`).join("") +
+   `</tbody></table>`;
+}
+function download() {
+  if (DEMO) { tg && INSIDE ? tg.showAlert("В демо-режиме отчёт не формируется.") : alert("В демо-режиме отчёт не формируется."); return; }
+  const url = new URL(current.report_url, location.href).href;
+  if (tg && tg.isVersionAtLeast && tg.isVersionAtLeast("8.0") && tg.downloadFile)
+    tg.downloadFile({url, file_name: `Отчёт_проверки_${current.id.slice(0, 8)}.xlsx`});
+  else if (tg && INSIDE) tg.openLink(url);
+  else location.href = url;
+}
+
+/* ---------- Демо ---------- */
+function demoRun(total) {
+  let done = 0;
+  const step = () => {
+    done = Math.min(total, done + total / 12);
+    $("bar").firstElementChild.style.width = (100 * done / total) + "%";
+    $("waitNote").textContent = `${mb(done)} из ${mb(total)}`;
+    if (done < total) return setTimeout(step, 120);
+    checking(); setTimeout(() => showResult(DEMO_JOB), 1400);
+  };
+  step();
+}
+
+/* ---------- Старт ---------- */
+setupTelegram();
+if (DEMO) {
+  $("demoBanner").classList.remove("hidden");
+  files = DEMO_JOB.result.files.map(f => ({name: f.name, size: f.size}));
+  if (qs.get("view") === "result") showResult(DEMO_JOB); else show("vHome");
+} else if (!INSIDE) {
+  show("vOutside");
+} else if (qs.get("job")) {
+  openJob(qs.get("job"));
+} else {
+  show("vHome");
+}
+</script>
+</body>
+</html>

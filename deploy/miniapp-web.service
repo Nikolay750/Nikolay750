@@ -1,0 +1,13 @@
+[Unit]
+Description=Mini App: проверка смет и актов (web)
+After=network.target
+
+[Service]
+WorkingDirectory=/srv/miniapp
+EnvironmentFile=/srv/miniapp/.env
+ExecStart=/srv/miniapp/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=always
+User=miniapp
+
+[Install]
+WantedBy=multi-user.target

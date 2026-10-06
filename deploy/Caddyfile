@@ -1,0 +1,9 @@
+# Caddy сам получит HTTPS-сертификат. Ограничения на размер тела по умолчанию нет.
+check.example.ru {
+    reverse_proxy 127.0.0.1:8000 {
+        transport http {
+            read_timeout 10m
+            write_timeout 10m
+        }
+    }
+}
