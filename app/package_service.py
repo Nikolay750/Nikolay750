@@ -26,6 +26,7 @@ from . import storage
 from .ingest import fetch_by_link
 from .ingest.errors import IngestError
 from .models import Package, PackageStatus, SourceFile
+from .security import safe_filename
 
 
 class PackageServiceError(Exception):
@@ -50,8 +51,13 @@ def get_or_create_draft(client_id: str, client_name: Optional[str] = None) -> Pa
 
 def add_direct_file(client_id: str, client_name: Optional[str], filename: str,
                      tmp_path: str, size: int) -> Package:
-    """Файл, присланный прямо в чат (бот уже скачал его сам через Bot API, ≤20 МБ)."""
+    """Файл, присланный прямо в чат (бот уже скачал его сам через Bot API, ≤20 МБ).
+
+    filename приходит от Telegram (doc.file_name) — это текст, который
+    прислал клиент, НЕ доверенный ввод; санитизируем, прежде чем превращать
+    в компонент пути (см. app/security.py)."""
     pkg = get_or_create_draft(client_id, client_name)
+    filename = safe_filename(filename)
     dest = storage.files_dir(pkg.client_id, pkg.id) / filename
     n = 1
     while dest.exists():

@@ -115,9 +115,10 @@ class Package:
     @staticmethod
     def create(client_id: str, client_name: Optional[str] = None,
                object_title: Optional[str] = None) -> "Package":
+        from .security import safe_client_id
         return Package(
             id=new_id(),
-            client_id=str(client_id),
+            client_id=safe_client_id(client_id),
             client_name=client_name,
             object_title=object_title,
         )

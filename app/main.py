@@ -65,14 +65,14 @@ def package_detail(client_id: str, package_id: str, x_tg_init_data: Optional[str
     if detail.get("report_path"):
         detail["report_url"] = (
             f"/api/packages/{client_id}/{package_id}/report"
-            f"?t={sign_link(config.BOT_TOKEN or 'dev', f'{client_id}:{package_id}')}"
+            f"?t={sign_link(config.link_signing_secret(), f'{client_id}:{package_id}')}"
         )
     return detail
 
 
 @app.get("/api/packages/{client_id}/{package_id}/report")
 def package_report(client_id: str, package_id: str, t: str):
-    if not check_link(config.BOT_TOKEN or "dev", f"{client_id}:{package_id}", t):
+    if not check_link(config.link_signing_secret(), f"{client_id}:{package_id}", t):
         raise HTTPException(403, "Ссылка устарела — откройте пакет заново")
     try:
         detail = queue_service.get_package_detail(client_id, package_id)
@@ -125,14 +125,14 @@ def prepare_client_report(client_id: str, package_id: str, x_tg_init_data: Optio
         "client_report_path": pkg.client_report_path,
         "client_report_url": (
             f"/api/packages/{client_id}/{package_id}/client_report"
-            f"?t={sign_link(config.BOT_TOKEN or 'dev', f'{client_id}:{package_id}:client')}"
+            f"?t={sign_link(config.link_signing_secret(), f'{client_id}:{package_id}:client')}"
         ),
     }
 
 
 @app.get("/api/packages/{client_id}/{package_id}/client_report")
 def client_report_file(client_id: str, package_id: str, t: str):
-    if not check_link(config.BOT_TOKEN or "dev", f"{client_id}:{package_id}:client", t):
+    if not check_link(config.link_signing_secret(), f"{client_id}:{package_id}:client", t):
         raise HTTPException(403, "Ссылка устарела — соберите отчёт заново")
     from . import storage
     try:

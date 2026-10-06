@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from ..models import SourceFile
+from ..security import safe_filename
 from .errors import IngestError, RemoteNotFoundError, RemoteUnavailableError, UnsupportedLinkError
 
 PUBLIC_PAGE_RE = re.compile(r"cloud\.mail\.ru/public/([^/]+)/([^/?#]+)")
@@ -145,7 +146,7 @@ def fetch_public_resource(public_url: str, dest_dir: Path, session: HttpSession,
     out: list[SourceFile] = []
 
     if kind == "file":
-        name = body.get("name") or token.split("/")[-1]
+        name = safe_filename(body.get("name") or token.split("/")[-1])
         dest = dest_dir / name
         size = _download(session, download_base, token, dest, max_file_bytes, timeout)
         out.append(SourceFile(name=dest.name, path=dest.name, size=size, source="mailru", origin_url=public_url))
@@ -158,7 +159,7 @@ def fetch_public_resource(public_url: str, dest_dir: Path, session: HttpSession,
         for item in items:
             if not isinstance(item, dict) or item.get("type") != "file":
                 continue
-            name = item.get("name") or "file"
+            name = safe_filename(item.get("name") or "file")
             item_rel = item.get("weblink") or item.get("name")
             if not item_rel:
                 continue

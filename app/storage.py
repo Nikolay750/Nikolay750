@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from .models import Package
+from .security import safe_client_id, safe_filename
 
 # Можно переопределить через переменную окружения (удобно для тестов).
 DATA_DIR = Path(os.environ.get("MINIAPP_DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
@@ -42,7 +43,13 @@ def _lock_for(package_id: str) -> threading.Lock:
 
 
 def _package_dir(client_id: str, package_id: str) -> Path:
-    return PACKAGES_DIR / str(client_id) / package_id
+    # defense in depth: client_id и package_id становятся компонентами пути
+    # на диске — санитизируем даже если вызывающий код (bot-хендлер,
+    # напрямую переданный chat.id) этого не сделал. package_id — свой же
+    # uuid4().hex (models.new_id()), но тоже не доверяем слепо чужому вводу,
+    # если он когда-нибудь попадёт сюда из URL (см. app/main.py).
+    safe_pkg_id = safe_filename(str(package_id), default="unknown")
+    return PACKAGES_DIR / safe_client_id(client_id) / safe_pkg_id
 
 
 def _meta_path(client_id: str, package_id: str) -> Path:
@@ -85,12 +92,13 @@ def find_package(package_id: str) -> Optional[Package]:
     """Найти пакет по id, не зная client_id (нужно для коротких ссылок в Mini App)."""
     if not PACKAGES_DIR.exists():
         return None
+    safe_pkg_id = safe_filename(str(package_id), default="unknown")
     for client_dir in PACKAGES_DIR.iterdir():
         if not client_dir.is_dir():
             continue
-        candidate = client_dir / package_id / "meta.json"
+        candidate = client_dir / safe_pkg_id / "meta.json"
         if candidate.exists():
-            return load_package(client_dir.name, package_id)
+            return load_package(client_dir.name, safe_pkg_id)
     return None
 
 

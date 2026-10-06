@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from ..models import SourceFile
+from ..security import safe_filename
 from .errors import IngestError, RemoteNotFoundError, RemoteUnavailableError, UnsupportedLinkError
 
 API_BASE = "https://cloud-api.yandex.net/v1/disk/public/resources"
@@ -129,7 +130,9 @@ def fetch_public_resource(public_url: str, dest_dir: Path, session: HttpSession,
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     if kind == "file":
-        name = root_meta.get("name") or "file"
+        # имя пришло из ответа облака, не наш ввод — санитизируем перед
+        # использованием как компонента пути (см. app/security.py)
+        name = safe_filename(root_meta.get("name") or "file")
         dest = dest_dir / name
         size = _download_file(session, public_url, None, dest, max_file_bytes, timeout)
         return [SourceFile(name=name, path=dest.name, size=size, source="yandex", origin_url=public_url)]
@@ -148,7 +151,7 @@ def _walk_dir(session, public_key: str, path: str, dest_dir: Path, out: list[Sou
               max_file_bytes: int, timeout: int) -> None:
     for item in _list_dir(session, public_key, path, timeout):
         item_path = item.get("path", "")
-        name = item.get("name", os.path.basename(item_path) or "file")
+        name = safe_filename(item.get("name") or os.path.basename(item_path) or "file")
         if item.get("type") == "dir":
             _walk_dir(session, public_key, item_path, dest_dir, out, max_file_bytes, timeout)
             continue
