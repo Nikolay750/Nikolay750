@@ -36,7 +36,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import FSInputFile, Message
 
-from app import delivery_service, package_service as svc, storage
+from app import checker, delivery_service, package_service as svc, storage
 from app.ingest.mailru import is_mailru_link
 from app.ingest.yandex import is_yandex_disk_link
 from app.models import PackageStatus
@@ -95,6 +95,9 @@ async def finish(m: Message):
     await _notify_operator(
         m.bot, f"Новый пакет в очереди: {pkg.client_name or pkg.client_id}, файлов: {len(pkg.files)} (id {pkg.id})"
     )
+    # Step 9.1: раньше это нигде не вызывалось — пакет оставался в QUEUED
+    # навсегда, пока кто-то вручную не дёргал checker.process_all_queued().
+    checker.submit_for_processing(pkg)
 
 
 @dp.message(F.document)
@@ -137,6 +140,7 @@ async def on_link(m: Message):
         m.bot, f"Новый пакет в очереди (по ссылке): {pkg.client_name or pkg.client_id}, "
                f"файлов: {len(pkg.files)} (id {pkg.id})"
     )
+    checker.submit_for_processing(pkg)
 
 
 @dp.message()
@@ -176,6 +180,11 @@ async def _delivery_loop(bot: Bot) -> None:
 
 async def main():
     bot = Bot(TOKEN)
+    # Step 9.1: подхватить пакеты, оставшиеся в QUEUED с прошлых запусков
+    # (например, застрявшие до того, как submit_for_processing стал
+    # вызываться в on_link/finish) — без этого они виснут в очереди навсегда.
+    for pkg in checker.process_all_queued():
+        logging.getLogger(__name__).info("Обработан отложенный пакет %s (%s)", pkg.id, pkg.status)
     asyncio.create_task(_delivery_loop(bot))
     await dp.start_polling(bot)
 
