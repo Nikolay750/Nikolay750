@@ -24,6 +24,14 @@ import os
 import re
 import tempfile
 
+from dotenv import load_dotenv
+
+# Step 9.1: грузим .env ДО чтения os.environ ниже — иначе переменные из .env
+# видит только uvicorn (у него автозагрузка через --env-file/окружение
+# процесса), а bot.py запускается отдельным процессом и .env не подхватывает,
+# из-за чего KeyError: 'BOT_TOKEN' при обычном запуске `python -m bot.bot`.
+load_dotenv()
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import FSInputFile, Message
@@ -36,7 +44,10 @@ from app.models import PackageStatus
 SEND_REPORTS_INTERVAL_SECONDS = 30
 
 TOKEN = os.environ["BOT_TOKEN"]
-OPERATOR_CHAT_ID = os.environ.get("OPERATOR_CHAT_ID")
+# Единое имя переменной с app/config.py (OPERATOR_TG_ID) — раньше здесь было
+# OPERATOR_CHAT_ID, не совпадавшее с .env.example/config.py, из-за чего
+# уведомления оператору молча не отправлялись бы (OPERATOR_CHAT_ID всегда None).
+OPERATOR_CHAT_ID = os.environ.get("OPERATOR_TG_ID")
 
 dp = Dispatcher()
 
