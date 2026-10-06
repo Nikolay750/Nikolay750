@@ -19,18 +19,21 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 import tempfile
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message
+from aiogram.types import FSInputFile, Message
 
-from app import package_service as svc
+from app import delivery_service, package_service as svc, storage
 from app.ingest.mailru import is_mailru_link
 from app.ingest.yandex import is_yandex_disk_link
 from app.models import PackageStatus
+
+SEND_REPORTS_INTERVAL_SECONDS = 30
 
 TOKEN = os.environ["BOT_TOKEN"]
 OPERATOR_CHAT_ID = os.environ.get("OPERATOR_CHAT_ID")
@@ -130,8 +133,39 @@ async def fallback(m: Message):
     await m.answer(WELCOME)
 
 
+async def send_pending_client_reports(bot: Bot) -> None:
+    """Фоновая рассылка: пакеты, разбор которых закрыт и для которых собран
+    клиентский Excel (status=REVIEWED, client_report_path задан, sent_at
+    пуст — см. delivery_service.list_ready_to_send), отправляются клиенту
+    и переводятся в SENT. Отдельная функция на процесс бота, а не вызов из
+    веб-backend'а: избегает межпроцессного RPC между FastAPI и aiogram —
+    они разные процессы (см. README/Caddyfile)."""
+    for pkg in delivery_service.list_ready_to_send():
+        path = storage.files_dir(pkg.client_id, pkg.id).parent / pkg.client_report_path
+        try:
+            await bot.send_document(
+                pkg.client_id, FSInputFile(str(path), filename=f"замечания_{pkg.id[:8]}.xlsx"),
+                caption="Проверка пакета завершена — список замечаний во вложении.",
+            )
+        except Exception:
+            logging.getLogger(__name__).exception("Не удалось отправить отчёт клиенту %s (пакет %s)",
+                                                    pkg.client_id, pkg.id)
+            continue
+        delivery_service.mark_sent(pkg.client_id, pkg.id)
+
+
+async def _delivery_loop(bot: Bot) -> None:
+    while True:
+        try:
+            await send_pending_client_reports(bot)
+        except Exception:
+            logging.getLogger(__name__).exception("Сбой цикла рассылки клиентских отчётов")
+        await asyncio.sleep(SEND_REPORTS_INTERVAL_SECONDS)
+
+
 async def main():
     bot = Bot(TOKEN)
+    asyncio.create_task(_delivery_loop(bot))
     await dp.start_polling(bot)
 
 

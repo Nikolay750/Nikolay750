@@ -105,7 +105,9 @@ class Package:
     status: str = PackageStatus.NEW.value
     files: list[SourceFile] = dataclasses.field(default_factory=list)
     findings: list[Finding] = dataclasses.field(default_factory=list)
-    report_path: Optional[str] = None
+    report_path: Optional[str] = None           # внутренний отчёт автопроверки (Step 5)
+    client_report_path: Optional[str] = None    # клиентский Excel с подтверждёнными замечаниями (Step 8)
+    sent_at: Optional[str] = None
     error: Optional[str] = None
     created_at: str = dataclasses.field(default_factory=_now_iso)
     updated_at: str = dataclasses.field(default_factory=_now_iso)

@@ -68,6 +68,8 @@ def get_package_detail(client_id: str, package_id: str) -> dict:
     d["files"] = [f.to_dict() for f in pkg.files]
     d["findings"] = [f.to_dict() for f in pkg.findings]
     d["report_path"] = pkg.report_path
+    d["client_report_path"] = pkg.client_report_path
+    d["sent_at"] = pkg.sent_at
     return d
 
 

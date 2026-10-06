@@ -258,9 +258,16 @@ async function decide(findingId, decision, editedText) {
 
 document.getElementById("btnFinalize").addEventListener("click", async () => {
   try {
-    await api(`/api/packages/${current.clientId}/${current.packageId}/finalize`, {method: "POST"});
+    const d = await api(`/api/packages/${current.clientId}/${current.packageId}/finalize`, {method: "POST"});
+    if (d.status === "reviewed") {
+      // разбор закрыт — сразу собираем клиентский Excel; фактическую отправку
+      // сообщения клиенту в Telegram довершает бот (см. bot/bot.py), после
+      // чего статус пакета становится "sent"
+      await api(`/api/packages/${current.clientId}/${current.packageId}/prepare_client_report`, {method: "POST"});
+    }
     await reloadDetail();
-    if (tg) tg.showAlert ? tg.showAlert("Пакет готов к отправке клиенту") : alert("Пакет готов к отправке клиенту");
+    const msg = "Отчёт собран и уйдёт клиенту автоматически в течение минуты (бот присылает его сам).";
+    if (tg && tg.showAlert) tg.showAlert(msg); else alert(msg);
   } catch (e) {
     alert(e.message);
   }

@@ -23,7 +23,7 @@ from typing import Optional
 from fastapi import Body, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 
-from . import config, queue_service, review_service
+from . import config, delivery_service, queue_service, review_service
 from .tg_auth import AuthError, check_link, sign_link, validate_init_data
 
 app = FastAPI(title="Проверка ИД — очередь оператора", docs_url=None, redoc_url=None)
@@ -108,3 +108,42 @@ def finalize(client_id: str, package_id: str, x_tg_init_data: Optional[str] = He
         return review_service.finalize_review(client_id, package_id)
     except review_service.ReviewError as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/packages/{client_id}/{package_id}/prepare_client_report")
+def prepare_client_report(client_id: str, package_id: str, x_tg_init_data: Optional[str] = Header(None)):
+    """Собрать клиентский Excel (Step 8) — саму отправку сообщения клиенту
+    делает бот после скачивания этого файла по подписанной ссылке ниже;
+    этот эндпоинт не переводит пакет в SENT (см. delivery_service.mark_sent,
+    который бот вызывает после успешной отправки)."""
+    current_operator(x_tg_init_data)
+    try:
+        pkg = delivery_service.prepare_client_report(client_id, package_id)
+    except delivery_service.DeliveryError as e:
+        raise HTTPException(400, str(e))
+    return {
+        "client_report_path": pkg.client_report_path,
+        "client_report_url": (
+            f"/api/packages/{client_id}/{package_id}/client_report"
+            f"?t={sign_link(config.BOT_TOKEN or 'dev', f'{client_id}:{package_id}:client')}"
+        ),
+    }
+
+
+@app.get("/api/packages/{client_id}/{package_id}/client_report")
+def client_report_file(client_id: str, package_id: str, t: str):
+    if not check_link(config.BOT_TOKEN or "dev", f"{client_id}:{package_id}:client", t):
+        raise HTTPException(403, "Ссылка устарела — соберите отчёт заново")
+    from . import storage
+    try:
+        detail = queue_service.get_package_detail(client_id, package_id)
+    except KeyError:
+        raise HTTPException(404, "Пакет не найден")
+    path_name = detail.get("client_report_path")
+    if not path_name:
+        raise HTTPException(404, "Клиентский отчёт ещё не собран")
+    path = str(storage.files_dir(client_id, package_id).parent / path_name)
+    if not os.path.exists(path):
+        raise HTTPException(404, "Файл отчёта не найден")
+    return FileResponse(path, filename=f"замечания_{package_id[:8]}.xlsx",
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
